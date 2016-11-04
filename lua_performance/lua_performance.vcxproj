@@ -10,6 +10,21 @@
       <Platform>Win32</Platform>
     </ProjectConfiguration>
   </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="expand_type.cpp" />
+    <ClCompile Include="lua_performance.cpp" />
+    <ClCompile Include="main.cpp" />
+    <ClCompile Include="test2.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="expand_type.h" />
+    <ClInclude Include="lua_performance.h" />
+    <ClInclude Include="overview_type.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="lua_main.lua" />
+    <Text Include="lua_test.lua" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{095C5773-69E7-4999-BA1C-4EA67257D933}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
@@ -72,17 +87,17 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
+      <AdditionalIncludeDirectories>$(THE_3RD)/lua/src</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
+      <AdditionalLibraryDirectories>$(THE_3RD_OUT)/$(Configuration)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>lua.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
-  <ItemGroup>
-    <ClCompile Include="main.cpp" />
-  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
