@@ -15,13 +15,29 @@ local function do_dump(data)
 	dump(data,0)
 end
 
+local err_func = function(err)
+	print(err)
+	print(debug.traceback())
+end
+
+local safe_call = function(func, ...)
+	local res = nil
+	xpcall(function(...)
+		res = func(...)
+	end, err_func, ...)
+
+	return res
+end
+
 local wrapper = performance_wrap(f, function(data, sum_time)
 	do_dump(data)
-end)
+end, safe_call, 1)
+
 xpcall(wrapper, function(err)
 	print(err)
 	print(debug.traceback())
 end)
+
 
 
 print('success !!!')

@@ -46,7 +46,7 @@ namespace lua_performance
 		};
 #define keep_guard keeper k_dffdsfasdf(L)
 
-		static boost::chrono::high_resolution_clock::time_point getHighTime()
+		static inline boost::chrono::high_resolution_clock::time_point getHighTime()
 		{
 			return boost::chrono::high_resolution_clock::now();
 		}
@@ -347,12 +347,14 @@ namespace lua_performance
 			}
 
 			{
-				lua_createtable(L, 0, 2);
+				lua_createtable(L, 0, 3);
 				{
 					lua_pushinteger(L, node->data.count);
 					lua_setfield(L, -2, "count");
 					lua_pushinteger(L, node->data.sum_time.count());
 					lua_setfield(L, -2, "sum_time");
+					lua_pushinteger(L, node->data.sum_water_duration.count());
+					lua_setfield(L, -2, "sum_water_time");
 				}
 				lua_setfield(L, -2, "value");
 			}
@@ -394,13 +396,18 @@ namespace lua_performance
 		{
 			keep_guard;
 			lua_pushvalue(L, lua_upvalueindex(3)); // push stack upvalue 3:safe_call_function
-			int error_index = lua_gettop(L);
 			lua_pushvalue(L, lua_upvalueindex(2)); // push stack upvalue 2:performance_receiver(data, sum_time)
 			auto *data = get_global_data();
 
 			data_to_table_type_1(L, data->expand_root);
 
-			lua_pushinteger(L, data->expand_root->data.sum_time.count()); // nanoseconds, 1:10^9
+			i64 sum_interval = 0;
+			for (auto &pair : data->expand_root->child_map)
+			{
+				sum_interval += pair.second.data.sum_time.count();
+			}
+
+			lua_pushinteger(L, sum_interval/1000000); // ms, 1:10^3
 			lua_call(L, 3, 0);
 		}
 
@@ -447,6 +454,8 @@ namespace lua_performance
 			++n_data.count;
 			n_data.begin_point = begin_point;
 			data->push_stack(self_node);
+
+			self_node->data.sum_water_duration += getHighTime() - begin_point;
 		}
 
 		static void on_tail_call(lua_State *L, lua_Debug *ar)
@@ -460,6 +469,8 @@ namespace lua_performance
 			++n_data.count;
 			n_data.begin_point = begin_point;
 			data->push_stack(self_node);
+
+			self_node->data.sum_water_duration += getHighTime() - begin_point;
 		}
 
 		static void on_ret(lua_State *L, lua_Debug *ar)
@@ -530,6 +541,16 @@ namespace lua_performance
 		return lua_gettop(L) - 0;
 	}
 
+	static int call(lua_State *L)
+	{
+		auto params_count = lua_gettop(L) - 1;
+		lua_getfield(L, 1, "func");
+		lua_rotate(L, 2, 1);
+		lua_call(L, params_count, LUA_MULTRET);
+
+		return lua_gettop(L) - 1;
+	}
+
 	// wrap(func, receiver, safe_call_func)
 	int wrap(lua_State *L)
 	{
@@ -547,14 +568,57 @@ namespace lua_performance
 		{
 			lua_pushcfunction(L, default_safe_call);
 		}
-
 		else if (!lua_isfunction(L, 3))
 		{
 			lua_pushcfunction(L, default_safe_call);
 			lua_replace(L, 3);
 		}
 
-		lua_pushcclosure(L, proxy_func, 3);
+		lua_pushvalue(L, 1);
+		lua_insert(L, 1);
+		
+		lua_pushcclosure(L, proxy_func, 4);
+		auto func_index = lua_gettop(L);
+
+		lua_createtable(L, 3, 0); // result table
+		auto ret_index = lua_gettop(L);
+		{
+			keep_guard;
+
+			lua_pushvalue(L, 1);
+			lua_Debug real_func_ar;
+			lua_getinfo(L, ">S", &real_func_ar);
+
+			lua_createtable(L, 5, 0);
+			lua_pushstring(L, real_func_ar.source);
+			lua_setfield(L, -2, "source");
+			lua_pushstring(L, real_func_ar.short_src);
+			lua_setfield(L, -2, "short_src");
+			lua_pushinteger(L, real_func_ar.linedefined);
+			lua_setfield(L, -2, "linedefined");
+			lua_pushinteger(L, real_func_ar.lastlinedefined);
+			lua_setfield(L, -2, "lastlinedefined");
+			lua_pushstring(L, real_func_ar.what);
+			lua_setfield(L, -2, "what");
+
+			lua_setfield(L, -2, "debug_info");
+
+			lua_pushvalue(L, func_index);
+			lua_setfield(L, ret_index, "func");
+
+			lua_pushboolean(L, true);
+			lua_setfield(L, ret_index, "performance_wrap_flag");
+		}
+
+		if (luaL_newmetatable(L, "performance_meta"))
+		{
+			lua_pushcfunction(L, call);
+			lua_setfield(L, -2, "__call");
+		}
+
+		lua_pop(L,1);
+		luaL_setmetatable(L, "performance_meta");
+
 		return 1;
 	}
 
